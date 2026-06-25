@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 360" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1120" height="360" rx="10" fill="#ffffff"/>
+  <defs>
+    <marker id="arr2" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#f4f6f8;stroke:#3b5bdb;stroke-width:1.5;}
+    .hot{fill:#fff4e6;stroke:#f08c00;stroke-width:1.8;}
+    .io{fill:#eef2ff;stroke:#6366f1;stroke-width:1.5;}
+    .t{fill:#1f2933;font-size:15px;font-weight:600;}
+    .s{fill:#52606d;font-size:12px;}
+    .note{fill:#7a4d00;font-size:12px;font-weight:600;}
+    .a{stroke:#94a3b8;stroke-width:2;}
+  </style>
+
+  <text x="16" y="30" font-size="13" font-weight="700" fill="#1f2933">Forward + loss — fitting a 30B model on one GPU</text>
+
+  <rect class="io" x="16"  y="56" width="180" height="84" rx="8"/>
+  <text class="t" x="106" y="92"  text-anchor="middle">token batch</text>
+  <text class="s" x="106" y="113" text-anchor="middle">padded + attn mask</text>
+
+  <rect class="box" x="252" y="56" width="240" height="84" rx="8"/>
+  <text class="t" x="372" y="90"  text-anchor="middle">LoRA backbone</text>
+  <text class="s" x="372" y="113" text-anchor="middle">Mamba-2 + MoE (128 experts)</text>
+
+  <rect class="box" x="548" y="56" width="170" height="84" rx="8"/>
+  <text class="t" x="633" y="103" text-anchor="middle">hidden states</text>
+
+  <rect class="hot" x="774" y="56" width="330" height="84" rx="8"/>
+  <text class="t" x="939" y="90"  text-anchor="middle">lm_head LoRA  ⊕  Cut Cross-Entropy</text>
+  <text class="s" x="939" y="113" text-anchor="middle">fused projection + loss</text>
+
+  <line class="a" x1="198" y1="98" x2="250" y2="98" marker-end="url(#arr2)"/>
+  <line class="a" x1="494" y1="98" x2="546" y2="98" marker-end="url(#arr2)"/>
+  <line class="a" x1="720" y1="98" x2="772" y2="98" marker-end="url(#arr2)"/>
+
+  <line class="a" x1="939" y1="140" x2="939" y2="186" marker-end="url(#arr2)"/>
+  <rect class="box" x="774" y="190" width="330" height="74" rx="8"/>
+  <text class="t" x="939" y="222" text-anchor="middle">per-token CE  ×  loss mask</text>
+  <text class="s" x="939" y="244" text-anchor="middle">weighted mean → backward (AdamW)</text>
+
+  <rect class="hot" x="16" y="190" width="690" height="74" rx="8" fill="#fff4e6" stroke="#f08c00" stroke-width="1.2" opacity="0.55"/>
+  <text class="note" x="36" y="218">Why it fits:</text>
+  <text class="s" x="120" y="218">full-vocab logits are never materialised — the lm_head projection</text>
+  <text class="s" x="36" y="240">and cross-entropy are computed in one fused kernel, so peak memory stays inside a single 96 GB card.</text>
+
+  <rect class="box" x="16" y="290" width="1088" height="50" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.2"/>
+  <text class="t" x="36" y="320" font-size="14">MoE tying:</text>
+  <text class="s" x="128" y="320">128 experts share ONE LoRA (mean-pooled init · summed gradients)</text>
+  <text class="t" x="640" y="320" font-size="14">Precision:</text>
+  <text class="s" x="726" y="320">LoRA fp32 · base bf16 · MoE router fp32</text>
+</svg>
