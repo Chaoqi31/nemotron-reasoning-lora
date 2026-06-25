@@ -8,37 +8,59 @@ where this recipe scores around **0.86** on the private leaderboard.
 
 ## Approach
 
-The tasks are puzzle families with hidden rules — ciphers, cryptarithms, bit manipulation,
-unit conversions, gravity/equation problems, numerals. Rather than hope the base model
-guesses the rule, the method **teaches it to imitate an exact, verified solving procedure**.
+Every task is a **few-shot rule-induction puzzle**: a handful of worked examples demonstrate
+a hidden transformation, and the model must infer the rule and apply it to a held-out query.
+The method doesn't ask the base model to guess — it **distils an exact, verified solving
+procedure** into it.
 
-For each problem a deterministic solver works out the answer *and* records its steps. Those
-steps become a natural-language chain-of-thought, and the training target is that trace
-followed by a boxed answer:
+![Data pipeline](docs/pipeline.svg)
+
+### 1. Symbolic solvers recover the rule
+
+[`data_pipeline/reasoners/`](data_pipeline/reasoners/) holds one solver per family. Each
+searches the space of rules that family allows until it finds one consistent with every
+example:
+
+| Family | What the solver searches for |
+|--------|------------------------------|
+| `cipher` | the substitution map — by matching letter patterns against a word list |
+| `cryptarithm` | the digit↔symbol assignment and arithmetic op — concat detection first, then brute force (≤8 symbols) or backtracking, under a per-problem timeout |
+| `bit_manipulation` | the per-bit boolean function (AND / OR / XOR / NOT / AND-NOT / …) for each of the 8 output columns |
+| `gravity`, `numeral`, `unit_conversion`, `equation_numeric` | the family parameters that reproduce all the examples |
+
+### 2. The solver narrates its reasoning
+
+It doesn't just return the answer — it emits a natural-language chain-of-thought that
+mirrors *how* the rule was found, ending in a boxed answer. That trace is the training
+target. The prompt (the problem, up to the opening `<think>`) is masked; only the reasoning
+and answer are supervised:
 
 ```
 <think>
- ...step-by-step reasoning, mirroring the solver...
+ ...the deduction, step by step...
 </think>
 \boxed{ANSWER}<|im_end|>
 ```
 
-The prompt (the problem, ending at the opening `<think>`) is masked out; the loss only
-covers the reasoning and the answer. So the model isn't memorising answers — it's learning
-to *reproduce the procedure* that derives them.
+So the model never memorises answers — it learns to *reproduce the procedure* that derives
+them.
 
-![Data pipeline](docs/pipeline.svg)
+### 3. Only verified traces become training data
 
-Three choices make this work as a training signal:
+After generating a trace, the pipeline pulls the `\boxed{}` answer back out and compares it
+to ground truth. A problem is marked `rule_found` and added to the corpus **only if they
+match** — about **8,400 of ~9,500** problems clear this bar. Underdetermined `_guess`
+categories (where no unique rule exists) are kept as well, teaching the model to produce a
+plausible attempt rather than stall.
 
-- **Verified-only supervision.** A problem is included only when its solver actually found
-  the rule (or when the category is an open-ended `_guess` type). Every supervised trace is
-  therefore a correct derivation, not a noisy one.
-- **Sub-skill augmentation.** Augmenters synthesise extra examples — spelling, matching,
-  splitting, concatenation — that drill the smaller skills the puzzles compose from.
-- **One epoch, on purpose.** The corpus is near-deterministic, so a second pass just
-  memorises it and the score regresses. A single epoch with a cosine LR `2e-4 → 2e-5`,
-  dropout `0.05` and weight decay `0.01` learns the procedures and stops there.
+### 4. Training signal
+
+- **Masked SFT** — loss on the reasoning and answer only, never the prompt.
+- **Sub-skill augmentation** — extra spelling / matching / splitting / concatenation
+  examples that drill the smaller skills the puzzles compose from.
+- **One epoch, deliberately** — the corpus is near-deterministic, so a second pass just
+  memorises it and the score regresses. One epoch with cosine LR `2e-4 → 2e-5`, dropout
+  `0.05` and weight decay `0.01` learns the procedures and stops there.
 
 ## Training on one GPU
 
