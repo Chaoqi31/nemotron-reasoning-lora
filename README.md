@@ -13,7 +13,7 @@ a hidden transformation, and the model must infer the rule and apply it to a hel
 The method doesn't ask the base model to guess — it **distils an exact, verified solving
 procedure** into it.
 
-![Data pipeline](docs/pipeline.svg)
+![Method overview](docs/method.svg)
 
 ### 1. Symbolic solvers recover the rule
 
@@ -87,6 +87,8 @@ engineering bring it back inside one 96 GB GPU.
 [`data_pipeline/`](data_pipeline/) generates the training corpus end to end. The steps
 expect the competition `train.csv`, the base-model `tokenizer.json`, and a `problems.jsonl`
 rule index in the folder.
+
+![Data pipeline](docs/pipeline.svg)
 
 ```bash
 cd data_pipeline

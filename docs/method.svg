@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 250" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1180" height="250" rx="10" fill="#ffffff"/>
+  <defs>
+    <marker id="arrm" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#f4f6f8;stroke:#3b5bdb;stroke-width:1.5;}
+    .io{fill:#eef2ff;stroke:#6366f1;stroke-width:1.5;}
+    .gate{fill:#fff4e6;stroke:#f08c00;stroke-width:1.8;}
+    .keep{fill:#f0fdf4;stroke:#16a34a;stroke-width:1.6;}
+    .drop{fill:#fff1f2;stroke:#e11d48;stroke-width:1.4;}
+    .t{fill:#1f2933;font-size:15px;font-weight:600;}
+    .s{fill:#52606d;font-size:12px;}
+    .lbl{font-size:13px;font-weight:700;}
+    .a{stroke:#94a3b8;stroke-width:2;}
+  </style>
+
+  <text x="16" y="28" font-size="13" font-weight="700" fill="#1f2933">Solver-distilled reasoning — search → narrate → verify → train</text>
+
+  <rect class="io"  x="16"  y="64" width="178" height="84" rx="8"/>
+  <text class="t" x="105" y="100" text-anchor="middle">few-shot puzzle</text>
+  <text class="s" x="105" y="121" text-anchor="middle">examples + query</text>
+
+  <rect class="box" x="226" y="64" width="200" height="84" rx="8"/>
+  <text class="t" x="326" y="100" text-anchor="middle">symbolic solver</text>
+  <text class="s" x="326" y="121" text-anchor="middle">search the rule space</text>
+
+  <rect class="box" x="458" y="64" width="222" height="84" rx="8"/>
+  <text class="t" x="569" y="100" text-anchor="middle">narrate reasoning</text>
+  <text class="s" x="569" y="121" text-anchor="middle">&lt;think&gt; … &lt;/think&gt; \boxed{ }</text>
+
+  <rect class="gate" x="712" y="64" width="206" height="84" rx="8"/>
+  <text class="t" x="815" y="100" text-anchor="middle">verify</text>
+  <text class="s" x="815" y="121" text-anchor="middle">\boxed{ } == ground truth ?</text>
+
+  <rect class="keep" x="950" y="64" width="214" height="84" rx="8"/>
+  <text class="t" x="1057" y="100" text-anchor="middle">masked SFT · 1 epoch</text>
+  <text class="s" x="1057" y="121" text-anchor="middle">→ LoRA adapter</text>
+
+  <line class="a" x1="194" y1="106" x2="224" y2="106" marker-end="url(#arrm)"/>
+  <line class="a" x1="426" y1="106" x2="456" y2="106" marker-end="url(#arrm)"/>
+  <line class="a" x1="680" y1="106" x2="710" y2="106" marker-end="url(#arrm)"/>
+  <line class="a" x1="918" y1="106" x2="948" y2="106" marker-end="url(#arrm)"/>
+  <text class="lbl" x="933" y="98" text-anchor="middle" fill="#16a34a">✓</text>
+
+  <line class="a" x1="815" y1="148" x2="815" y2="190" marker-end="url(#arrm)"/>
+  <text class="lbl" x="828" y="172" fill="#e11d48">✗</text>
+  <rect class="drop" x="690" y="192" width="250" height="42" rx="8"/>
+  <text class="s" x="815" y="218" text-anchor="middle">dropped — rule_unknown</text>
+</svg>
