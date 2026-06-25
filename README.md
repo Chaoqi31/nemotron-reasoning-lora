@@ -6,109 +6,35 @@ with LoRA, on a single GPU, in one epoch. The run produces a small adapter packa
 [NVIDIA Nemotron Model Reasoning Challenge](https://www.kaggle.com/competitions/nvidia-nemotron-model-reasoning-challenge),
 where this recipe scores around **0.86** on the private leaderboard.
 
-## Approach
+## How it works
 
-Every task is a **few-shot rule-induction puzzle**: a handful of worked examples demonstrate
-a hidden transformation, and the model must infer the rule and apply it to a held-out query.
-The method doesn't ask the base model to guess — it **distils an exact, verified solving
-procedure** into it.
+The tasks are few-shot rule-induction puzzles — ciphers, cryptarithms, bit manipulation,
+unit conversions and more. Instead of hoping the base model guesses each hidden rule, a
+deterministic solver cracks every problem, narrates *how* it did it as a chain-of-thought,
+and only the traces whose answer is provably correct become training data. The model is
+fine-tuned to reproduce that reasoning.
 
 ![Method overview](docs/method.svg)
 
-### 1. Symbolic solvers recover the rule
+Fitting a 30B hybrid MoE model on one GPU takes a little engineering — the 128 experts share
+one tied LoRA, and a Cut Cross-Entropy forward keeps the full-vocabulary logits out of
+memory.
 
-[`data_pipeline/reasoners/`](data_pipeline/reasoners/) holds one solver per family. Each
-searches the space of rules that family allows until it finds one consistent with every
-example:
+> [!TIP]
+> The full write-up — per-solver algorithms, the verify-and-filter loop, tokenization, the
+> training loop, and the single-GPU memory work — is in **[docs/METHOD.md](docs/METHOD.md)**.
 
-| Family | What the solver searches for |
-|--------|------------------------------|
-| `cipher` | the substitution map — by matching letter patterns against a word list |
-| `cryptarithm` | the digit↔symbol assignment and arithmetic op — concat detection first, then brute force (≤8 symbols) or backtracking, under a per-problem timeout |
-| `bit_manipulation` | the per-bit boolean function (AND / OR / XOR / NOT / AND-NOT / …) for each of the 8 output columns |
-| `gravity`, `numeral`, `unit_conversion`, `equation_numeric` | the family parameters that reproduce all the examples |
+## Quickstart
 
-### 2. The solver narrates its reasoning
-
-It doesn't just return the answer — it emits a natural-language chain-of-thought that
-mirrors *how* the rule was found, ending in a boxed answer. That trace is the training
-target. The prompt (the problem, up to the opening `<think>`) is masked; only the reasoning
-and answer are supervised:
-
-```
-<think>
- ...the deduction, step by step...
-</think>
-\boxed{ANSWER}<|im_end|>
-```
-
-So the model never memorises answers — it learns to *reproduce the procedure* that derives
-them.
-
-### 3. Only verified traces become training data
-
-After generating a trace, the pipeline pulls the `\boxed{}` answer back out and compares it
-to ground truth. A problem is marked `rule_found` and added to the corpus **only if they
-match** — about **8,400 of ~9,500** problems clear this bar. Underdetermined `_guess`
-categories (where no unique rule exists) are kept as well, teaching the model to produce a
-plausible attempt rather than stall.
-
-### 4. Training signal
-
-- **Masked SFT** — loss on the reasoning and answer only, never the prompt.
-- **Sub-skill augmentation** — extra spelling / matching / splitting / concatenation
-  examples that drill the smaller skills the puzzles compose from.
-- **One epoch, deliberately** — the corpus is near-deterministic, so a second pass just
-  memorises it and the score regresses. One epoch with cosine LR `2e-4 → 2e-5`, dropout
-  `0.05` and weight decay `0.01` learns the procedures and stops there.
-
-## Training on one GPU
-
-A 30B hybrid MoE model won't fine-tune on a single card the naive way — the optimizer
-states and the full-vocabulary logits alone blow past the memory budget. Four pieces of
-engineering bring it back inside one 96 GB GPU.
-
-![Forward and loss](docs/training.svg)
-
-- **One LoRA for all 128 experts.** A separate adapter per expert would be 128× the
-  trainable parameters and unstable over one epoch. The expert LoRA factors are *tied* —
-  initialised to their mean, kept in sync by summing gradients — so the bank learns one
-  shared low-rank update.
-- **Cut Cross-Entropy.** The largest memory spike is the `lm_head` projection over a big
-  vocabulary. Fusing that projection with the cross-entropy into one kernel means the full
-  logit tensor is never materialised.
-- **A hand-attached `lm_head` LoRA.** Unsloth drops it for MoE models, so it's re-added by
-  hand and its saved key prefix rewritten to match the runtime model.
-- **Split precision + Mamba fast path.** LoRA factors fp32, base weights bf16, MoE router
-  fp32; the Mamba CUDA fast path is re-enabled for the state-space layers.
-
-## Build the corpus
-
-[`data_pipeline/`](data_pipeline/) generates the training corpus end to end. The steps
-expect the competition `train.csv`, the base-model `tokenizer.json`, and a `problems.jsonl`
-rule index in the folder.
-
-![Data pipeline](docs/pipeline.svg)
+Build the corpus (see [docs/METHOD.md](docs/METHOD.md#7-corpus-tokenization) for inputs):
 
 ```bash
 cd data_pipeline
-python reasoning.py        # solver traces      -> reasoning/*.txt
-python augmentation.py     # augmented examples -> augmentations/*.txt
-python corpus.py           # tokenize + mask    -> corpus/<pid>/synthetic.jsonl
-python export_tokens.py    #                    -> tokens/ + index.jsonl
+python reasoning.py && python augmentation.py && python corpus.py && python export_tokens.py
 ```
 
-The output is two artefacts the trainer consumes — a token sequence plus loss mask per
-problem, and an index that fixes the training order:
-
-```
-tokens/<problem_id>/synthetic.json   # {"tokens": [...], "mask": [...]}   1 = supervised, 0 = prompt
-index.jsonl                          # {"problem_id": "...", "epoch": 0}
-```
-
-## Get started
-
-The base model is pulled automatically via `kagglehub`. Run it as a package:
+Then train — as a package, from the shell, or via the self-contained
+[`notebooks/train.ipynb`](notebooks/train.ipynb):
 
 ```python
 from nemotron_lora import train, TrainConfig
@@ -117,9 +43,7 @@ train(TrainConfig(corpus_path_override="data_pipeline/tokens",
                   train_order_path_override="data_pipeline/index.jsonl"))
 ```
 
-or from the shell with `python -m nemotron_lora`, or open
-[`notebooks/train.ipynb`](notebooks/train.ipynb) — the same code inline, ready to run on
-Kaggle with no repo imports.
+The base model is pulled automatically via `kagglehub`; the run writes `submission.zip`.
 
 > [!NOTE]
 > You'll need a single GPU with ~90 GB of VRAM. The reference run used one RTX PRO 6000
@@ -132,5 +56,6 @@ Kaggle with no repo imports.
 src/nemotron_lora/    # the trainer: config, data loading, training loop, adapter export
 data_pipeline/        # corpus generation: solvers, augmenters, tokenization
 notebooks/train.ipynb # the whole thing inline, Kaggle-ready
+docs/METHOD.md        # the detailed method write-up
 tests/                # self-checks for the data loaders
 ```
