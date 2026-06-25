@@ -1,10 +1,5 @@
 # Method
 
-A detailed walk-through of how this project turns the
-[NVIDIA Nemotron Model Reasoning Challenge](https://www.kaggle.com/competitions/nvidia-nemotron-model-reasoning-challenge)
-into a fine-tune that scores ~0.86 on the private leaderboard. For a quick overview see the
-[README](../README.md); this document is the full story.
-
 ## 1. The problem
 
 Each task is a **few-shot rule-induction puzzle**. The model is shown a handful of worked
@@ -192,18 +187,3 @@ Two costs would normally break a 30B fine-tune on a single 96 GB card, and each 
   spike that would otherwise dominate at this vocabulary size and sequence length.
 
 The reference run used one **RTX PRO 6000 Blackwell (96 GB)** and finished in **~4 hours**.
-
-## 10. Adapter export
-
-After training, the adapter is saved, its `lm_head` key prefix is rewritten, and the
-`adapter_*` files are zipped into `submission.zip` — the artefact the competition scores.
-No base weights are shipped; the adapter is a few hundred MB.
-
-## 11. Reproducibility
-
-- **From the public corpus snapshot** — feeding the trainer the exact token/index files the
-  winning run used reproduces the result, up to GPU-kernel non-determinism, provided the
-  CUDA kernels are pinned (`mamba-ssm==2.3.1`, `causal-conv1d==1.6.1`).
-- **From a fresh `data_pipeline/` rebuild** — regenerates an *equivalent* corpus, but example
-  ordering and inclusion may not be byte-identical, so the resulting adapter can differ
-  slightly. This reproduces the **method**, not necessarily the exact adapter.
