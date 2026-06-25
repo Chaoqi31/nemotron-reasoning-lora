@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Artifacts
+adapter_*.safetensors
+adapter_config.json
+submission.zip
+*.ipynb_checkpoints
+
+# Local data / models (download separately, see README)
+data/
+models/
+.DS_Store

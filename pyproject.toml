@@ -1,0 +1,30 @@
+[project]
+name = "nemotron-reasoning-lora"
+version = "0.1.0"
+description = "LoRA fine-tuning of Nemotron-3-Nano-30B-A3B for reasoning tasks"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "torch>=2.5",
+    "unsloth",
+    "trl",
+    "peft",
+    "transformers",
+    "datasets",
+    "accelerate",
+    "bitsandbytes",
+    "cut-cross-entropy",
+    "mamba-ssm",
+    "causal-conv1d",
+    "safetensors",
+    "kagglehub",
+    "tokenizers",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nemotron_lora"]
