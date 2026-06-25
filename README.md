@@ -16,9 +16,16 @@ fine-tuned to reproduce that reasoning.
 
 ![Method overview](docs/method.svg)
 
-Fitting a 30B hybrid MoE model on one GPU takes a little engineering — the 128 experts share
-one tied LoRA, and a Cut Cross-Entropy forward keeps the full-vocabulary logits out of
-memory.
+Fitting a 30B hybrid MoE model on one GPU takes a little engineering:
+
+- **One tied LoRA for 128 experts** — rather than a separate adapter per expert, the expert
+  LoRA factors are shared (mean-pooled init, summed gradients). That keeps the trainable
+  parameter count small and the single epoch stable.
+- **Cut Cross-Entropy** — the `lm_head` projection and the cross-entropy are fused into one
+  kernel, so the full-vocabulary logits (the dominant memory spike at this vocab size) are
+  never materialised.
+
+Together they keep peak memory inside a 96 GB card.
 
 > [!TIP]
 > The full write-up — per-solver algorithms, the verify-and-filter loop, tokenization, the
